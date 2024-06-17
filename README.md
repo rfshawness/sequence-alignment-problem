@@ -11,7 +11,6 @@ This project provides three distinct solutions to the sequence alignment problem
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Directory Structure](#directory-structure)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -56,4 +55,4 @@ Contributions are welcome! If you have any improvements or new features to add, 
 
 ## License
 
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT). See the [LICENSE](LICENSE) file in this repository for details.
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
