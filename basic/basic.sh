@@ -1,4 +1,4 @@
-for i in {1..15}
+for file in "../datapoints/$1"*.txt
 do
-   python3 basic_3.py "$1" "$2"
+   python3 basic_3.py "$file" "$2".txt
 done

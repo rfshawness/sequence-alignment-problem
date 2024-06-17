@@ -1,5 +1,5 @@
-# CSCI 570 Final Project 
 # Sequence Alignment Problem Memory Efficient Algorithm
+# Hirshberg Alogirithm
 
 import sys
 from resource import * 

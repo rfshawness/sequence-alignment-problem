@@ -1,5 +1,4 @@
-# # CSCI 570 Final Project 
-# # Sequence Alignment Problem 
+# # Sequence Alignment Problem: Classic Algorithm
 
 
 import sys
