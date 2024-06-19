@@ -6,6 +6,8 @@ This project provides three distinct solutions to the sequence alignment problem
 2. Memory Efficient Solution using Hirschberg's Algorithm
 3. Miniature Version of the BLAST Algorithm (in progress)
 
+The goal is to apply these algorithms to datasets of sports sequences in order to analyze and predict specific action outcome patterns.
+
 ## Table of Contents
 
 - [Introduction](#introduction)
