@@ -1,12 +1,12 @@
 def generate_words(sequence, word_length):
-    words = [sequence[i:i+word_length] for i in range(len(sequence) - word_length + 1)]
+    words = [(sequence[i:i+word_length], i) for i in range(len(sequence) - word_length + 1)]
     return words
 
-def generate_high_scoreing_neighbors(words, matrix):
+def generate_high_scoreing_neighbors(words, scoring_matrix):
     # for the given word, generate all possible neighboring words
     # if the score of the new word is greater than threshold, add it to the list of neighboring words  
 
-    word_len = len(words[0])
+    word_len = len(words[0][0])  # words are now tuples, so get length of first element of first tuple
 
     # Common values to use with BLOSUM62 matrix:
         # K-mer length = 2, threshold = 8
@@ -24,77 +24,83 @@ def generate_high_scoreing_neighbors(words, matrix):
     # generate all 20^len(word) possible neighboring words
     # TODO: remove duplicates from the list and only consider unique words
     neighboring_words = set()
-    for word in words:
+    for word, index in words:  # unpack word and index from each tuple
         for i in range(word_len):
-            for j in matrix.keys():
+            for j in scoring_matrix.keys():
                 new_word = word[:i] + j + word[i+1:]
                 score = 0
                 for k in range(word_len):
-                    score += matrix[word[k]][new_word[k]]
+                    score += scoring_matrix[word[k]][new_word[k]]
                 if score >= threshold:
-                    neighboring_words.add(new_word)
+                    neighboring_words.add((new_word, index))  # add new word and index as a tuple
 
     return list(neighboring_words)
 
-def queryProcessing(matrix):
+def queryProcessing():
     # read the input file
     # the input file will be in a directory called "input"
     with open("./input/input.txt", "r") as file:
         lines = file.readlines()
         word_length = int(lines[0])
-        sequence = lines[1].strip()
+        query_sequence = lines[1].strip()
 
     # generate the words
-    words = generate_words(sequence, word_length)
+    words = generate_words(query_sequence, word_length)
 
-    return words
+    return words, query_sequence
 
 
 
 def find_matches_in_database(high_scoring_words, database_sequences, k):
     matches = {}
-    for seq_id, db_seq in enumerate(database_sequences):
+    for db_seq_id, db_seq in enumerate(database_sequences):
         for i in range(len(db_seq) - k + 1):
             k_mer = db_seq[i:i + k]
-            if k_mer in high_scoring_words:
-                if k_mer not in matches:
-                    matches[k_mer] = []
-                matches[k_mer].append((seq_id, i))
+            for word, index in high_scoring_words:
+                if k_mer == word:
+                    if (word, index) not in matches:
+                        matches[(word, index)] = []
+                    matches[(word, index)].append((db_seq_id, i))
     return matches
 
 
-def extend_match(match, query_sequence, database_sequence, scoring_matrix):
+def extend_match(match, query_sequence, database_sequence, scoring_matrix, match_start_db, match_start_query):
     left_extension = ""
     right_extension = ""
-    current_score = scoring_matrix[match]
-    max_score = current_score
+    current_score = sum(scoring_matrix[query_sequence[match_start_query + i]][database_sequence[match_start_db + i]] for i in range(len(match))) # calculate initial score of match 
+    print(f"Initial score of match {match}: {current_score}")
+    total_score = 0
+    match_length = len(match)
 
-    # Extend to the left
+
+
+
+    # Extend the match to the left and right
+    # Exdend to the left only if next character alignment is greater or equal to 0
     i = 1
-    while current_score >= max_score and i <= len(match):
-        left_extension = query_sequence[-i] + left_extension
-        current_score += scoring_matrix[query_sequence[-i]]
-        if current_score > max_score:
-            max_score = current_score
+    while match_start_query - i >= 0 and match_start_db - i >= 0:
+        if scoring_matrix[query_sequence[match_start_query - i]][database_sequence[match_start_db - i]] > 0:
+            left_extension = query_sequence[match_start_query - i] + left_extension
+            current_score += scoring_matrix[query_sequence[match_start_query - i]][database_sequence[match_start_db - i]]
         i += 1
-
+    total_score = current_score
     # Reset current score
-    current_score = scoring_matrix[match]
+    current_score = 0
 
     # Extend to the right
-    i = 1
-    while current_score >= max_score and i <= len(match):
-        right_extension = right_extension + database_sequence[i]
-        current_score += scoring_matrix[database_sequence[i]]
-        if current_score > max_score:
-            max_score = current_score
+    i = 0
+    while match_start_query + match_length + i < len(query_sequence) and match_start_db + match_length + i < len(database_sequence):
+        if scoring_matrix[query_sequence[match_start_query + match_length]][database_sequence[match_start_db + match_length]] > 0:
+            right_extension = right_extension + query_sequence[match_start_query + match_length]
+            current_score += scoring_matrix[query_sequence[match_start_query + match_length]][database_sequence[match_start_db + match_length]]
         i += 1
+    total_score += current_score
 
-    return left_extension + match + right_extension
+    return left_extension + match + right_extension, total_score
 
 def main():
    # BLOSUM 62 Scoring Matrix
-   matrix = {
+   scoring_matrix = {
       "A": {"A": 4, "R": -1, "N": -2, "D": -2, "C": 0, "Q": -1, "E": -1, "G": 0, "H": -2, "I": -1, "L": -1, "K": -1, "M": -1, "F": -2, "P": -1, "S": 1, "T": 0, "W": -3, "Y": -2, "V": 0},
       "R": {"A": -1, "R": 5, "N": 0, "D": -2, "C": -3, "Q": 1, "E": 0, "G": -2, "H": 0, "I": -3, "L": -2, "K": 2, "M": -1, "F": -3, "P": -2, "S": -1, "T": -1, "W": -3, "Y": -2, "V": -3},
       "N": {"A": -2, "R": 0, "N": 6, "D": 1, "C": -3, "Q": 0, "E": 0, "G": 0, "H": 1, "I": -3, "L": -3, "K": 0, "M": -2, "F": -3, "P": -2, "S": 1, "T": 0, "W": -4, "Y": -2, "V": -3},
@@ -118,20 +124,26 @@ def main():
       }
    
    # read the input file and generate words
-   words = queryProcessing(matrix)
+   words, query_sequence = queryProcessing()
    # generate neighboring words for each word
-   word_neighbors = generate_high_scoreing_neighbors(words, matrix)
+   word_neighbors = generate_high_scoreing_neighbors(words, scoring_matrix)
    print(word_neighbors)
 
    # check for matches in the database
-   database_sequences = ["ACDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY"]
+   database_sequences = ["RATCDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY"]
    k = 3
    matches = find_matches_in_database(word_neighbors, database_sequences, k)
+
+   print(matches)
    
    # extend the matches
-   for match in matches:
-        for seq_id, i in matches[match]:
-            print(extend_match(match, words[seq_id], database_sequences[seq_id], matrix))
+   for (match, match_start_query), positions in matches.items():
+        # match_start_query is now directly taken from the match tuple
+        #TODO: error with neighbor words not being found in the query sequence
+        for position in positions:
+            db_index, match_start_db = position
+            extended_match, score = extend_match(match, query_sequence, database_sequences[db_index], scoring_matrix, match_start_db, match_start_query)
+            print(f"Extended match for {match} at db position {match_start_db} in sequence {db_index}: {extended_match} with score {score}")
 
 if __name__ == "__main__":
     main()
