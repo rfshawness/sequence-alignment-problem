@@ -1,12 +1,17 @@
+import os
+
+# Take query sequence and return all possible words of length word_length
 def generate_words(sequence, word_length):
+
     words = [(sequence[i:i+word_length], i) for i in range(len(sequence) - word_length + 1)]
     return words
 
-def generate_high_scoreing_neighbors(words, scoring_matrix):
-    # for the given word, generate all possible neighboring words
-    # if the score of the new word is greater than threshold, add it to the list of neighboring words  
 
-    word_len = len(words[0][0])  # words are now tuples, so get length of first element of first tuple
+
+# Take a list of words and generate all possible neighboring words with a score greater than threshold
+def generate_high_scoreing_neighbors(words, scoring_matrix): 
+
+    word_len = len(words[0][0]) # words are tuples of (word, index)
 
     # Common values to use with BLOSUM62 matrix:
         # K-mer length = 2, threshold = 8
@@ -32,12 +37,15 @@ def generate_high_scoreing_neighbors(words, scoring_matrix):
                 for k in range(word_len):
                     score += scoring_matrix[word[k]][new_word[k]]
                 if score >= threshold:
-                    neighboring_words.add((new_word, index))  # add new word and index as a tuple
+                    neighboring_words.add((new_word, index))  
 
     return list(neighboring_words)
 
+
+
+# Read the input file and return the words and the query sequence
 def queryProcessing():
-    # read the input file
+
     # the input file will be in a directory called "input"
     with open("./input/input.txt", "r") as file:
         lines = file.readlines()
@@ -51,31 +59,44 @@ def queryProcessing():
 
 
 
-def find_matches_in_database(high_scoring_words, database_sequences, k):
+# Find all matches in the database and their positions
+def find_matches_in_database(high_scoring_words, directory, file_names, k):
+
+    # Initialize a dictionary to store the matches
     matches = {}
-    for db_seq_id, db_seq in enumerate(database_sequences):
-        for i in range(len(db_seq) - k + 1):
-            k_mer = db_seq[i:i + k]
-            for word, index in high_scoring_words:
-                if k_mer == word:
-                    if (word, index) not in matches:
-                        matches[(word, index)] = []
-                    matches[(word, index)].append((db_seq_id, i))
+
+    # Process each file one at a time
+    for file_name in file_names:
+        # Read the sequence from the file
+        with open(os.path.join(directory, file_name), "r") as file:
+            database_sequence = file.readline().strip()  # Since each file has only one line
+            print(f"Database sequence: {database_sequence}")
+
+        # Search for the high scoring words in the database sequence
+        for word_tuple in high_scoring_words:
+            word, query_position = word_tuple
+            print(f"Searching for word {word} in database sequence")
+            for i in range(len(database_sequence) - k + 1):
+                if database_sequence[i:i+k] == word:
+                    # Store the match in the dictionary along with the file name and position
+                    if word not in matches:
+                        matches[word] = []
+                    matches[word].append((file_name, i, query_position))
+                    print(f"Match found at position {i} in database sequence")
+
     return matches
 
 
+
+# Extend the found matches to the left and right
 def extend_match(match, query_sequence, database_sequence, scoring_matrix, match_start_db, match_start_query):
+
     left_extension = ""
     right_extension = ""
     current_score = sum(scoring_matrix[query_sequence[match_start_query + i]][database_sequence[match_start_db + i]] for i in range(len(match))) # calculate initial score of match 
-    print(f"Initial score of match {match}: {current_score}")
     total_score = 0
     match_length = len(match)
 
-
-
-
-    # Extend the match to the left and right
     # Exdend to the left only if next character alignment is greater or equal to 0
     i = 1
     while match_start_query - i >= 0 and match_start_db - i >= 0:
@@ -84,10 +105,11 @@ def extend_match(match, query_sequence, database_sequence, scoring_matrix, match
             current_score += scoring_matrix[query_sequence[match_start_query - i]][database_sequence[match_start_db - i]]
         i += 1
     total_score = current_score
+    
     # Reset current score
     current_score = 0
 
-    # Extend to the right
+    # Extend to the right only if next character alignment is greater or equal to 0
     i = 0
     while match_start_query + match_length + i < len(query_sequence) and match_start_db + match_length + i < len(database_sequence):
         if scoring_matrix[query_sequence[match_start_query + match_length]][database_sequence[match_start_db + match_length]] > 0:
@@ -97,6 +119,9 @@ def extend_match(match, query_sequence, database_sequence, scoring_matrix, match
     total_score += current_score
 
     return left_extension + match + right_extension, total_score
+
+
+
 
 def main():
    # BLOSUM 62 Scoring Matrix
@@ -123,27 +148,36 @@ def main():
       "V": {"A": 0, "R": -3, "N": -3, "D": -3, "C": -1, "Q": -2, "E": -2, "G": -3, "H": -3, "I": 3, "L": 1, "K": -2, "M": 1, "F": -1, "P": -2, "S": -2, "T": 0, "W": -3, "Y": -1, "V": 4}
       }
    
-   # read the input file and generate words
+   # Read the input file and return the words and the query sequence
    words, query_sequence = queryProcessing()
-   # generate neighboring words for each word
+   print(f"Words: {words}")
+   k = len(words[0][0])  # k-mer length
+
+   # Generate neighboring words for each word
    word_neighbors = generate_high_scoreing_neighbors(words, scoring_matrix)
-   print(word_neighbors)
+   print(f"Query sequence: {query_sequence}")
+   print(f"Word neighbors: {word_neighbors}")
 
-   # check for matches in the database
-   database_sequences = ["RATCDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY", "ACDEFGHIKLMNPQRSTVWY"]
-   k = 3
-   matches = find_matches_in_database(word_neighbors, database_sequences, k)
+   # Get the directory that the script is in, and then the directory where the sequence files are stored
+   script_directory = os.path.dirname(os.path.abspath(__file__))
+   directory = os.path.join(script_directory, "sequenceDatabase")
+   print(f"Database directory: {directory}")
+   file_names = os.listdir(directory) # get all the file names in the directory
+   
+   print(f"Database files: {file_names}")
 
+   # Find all matches in the database
+   matches = find_matches_in_database(word_neighbors, directory, file_names, k)
    print(matches)
    
    # extend the matches
-   for (match, match_start_query), positions in matches.items():
-        # match_start_query is now directly taken from the match tuple
-        #TODO: error with neighbor words not being found in the query sequence
-        for position in positions:
-            db_index, match_start_db = position
-            extended_match, score = extend_match(match, query_sequence, database_sequences[db_index], scoring_matrix, match_start_db, match_start_query)
-            print(f"Extended match for {match} at db position {match_start_db} in sequence {db_index}: {extended_match} with score {score}")
+   for match, positions in matches.items():
+       for position in positions:
+        file_name, match_start_db, match_start_query = position
+        with open(os.path.join(directory, file_name), "r") as file:
+            database_sequence = file.readline().strip()
+        extended_match, score = extend_match(match, query_sequence, database_sequence, scoring_matrix, match_start_db, match_start_query)
+        print(f"Extended match for {match} at db position {match_start_db} in file {file_name}: {extended_match} with score {score}")
 
 if __name__ == "__main__":
     main()
